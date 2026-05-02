@@ -1,0 +1,35 @@
+# ============================================================
+# .dockerignore — files to EXCLUDE from the Docker build context
+# ============================================================
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Uploaded files from local testing
+uploads/
+
+# Dev tools
+.git/
+.gitignore
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+
+# Test files
+tests/
+*.test.py
+
+# Docs
+*.md
+README*

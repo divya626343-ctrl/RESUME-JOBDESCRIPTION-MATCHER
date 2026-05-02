@@ -1,0 +1,18 @@
+# ============================================================
+# requirements.txt
+# Pin major versions — patch versions can update freely.
+# ============================================================
+ 
+# Web framework + ASGI server
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9      # required for FastAPI file uploads
+ 
+# File parsing
+PyPDF2==3.0.1
+docx2txt==0.8
+ 
+# ML
+sentence-transformers==2.7.0
+torch==2.3.0                 # CPU-only build used in Dockerfile
+ 

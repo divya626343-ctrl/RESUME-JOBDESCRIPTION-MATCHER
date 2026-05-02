@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Matcher</title>
+
+  <!-- Google Fonts: Syne (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Our stylesheet — served from /static/style.css by FastAPI -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       HEADER
+  ════════════════════════════════════════════════════ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark"></span>
+        <span class="logo-text">ResuMatch</span>
+      </div>
+      <p class="header-tagline">Semantic resume ranking · powered by AI</p>
+    </div>
+  </header>
+
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN
+  ════════════════════════════════════════════════════ -->
+  <main class="main-grid">
+
+    <!-- ── LEFT PANEL: Input form ─────────────────── -->
+    <section class="panel panel-input">
+
+      <h2 class="panel-title">Match resumes</h2>
+
+      <!--
+        enctype="multipart/form-data" is REQUIRED for file uploads.
+        Without it, the browser sends files as text which corrupts them.
+        action="/match" → FastAPI's POST /match route
+        method="POST"   → sends data in the body, not the URL
+      -->
+      <form
+        id="match-form"
+        action="/match"
+        method="POST"
+        enctype="multipart/form-data"
+        novalidate
+      >
+
+        <!-- Job description textarea -->
+        <div class="field">
+          <label class="field-label" for="job_description">
+            Job description
+          </label>
+          <textarea
+            id="job_description"
+            name="job_description"
+            class="field-textarea"
+            rows="10"
+            placeholder="Paste the full job description here…"
+            required
+          ></textarea>
+        </div>
+
+        <!-- File upload -->
+        <div class="field">
+          <label class="field-label" for="resumes">
+            Resumes
+            <span class="field-hint">PDF, DOCX or TXT · multiple allowed</span>
+          </label>
+
+          <!--
+            multiple  → lets user select more than one file
+            name="resumes" → must match the FastAPI parameter name exactly
+            accept    → browser-side file type filter (not a security check)
+          -->
+          <div class="upload-zone" id="upload-zone">
+            <input
+              id="resumes"
+              name="resumes"
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt"
+              class="upload-input"
+            />
+            <div class="upload-prompt">
+              <span class="upload-icon">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 16V8M12 8l-3 3M12 8l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M3 16v1a4 4 0 004 4h10a4 4 0 004-4v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span class="upload-label">Drop files or click to browse</span>
+              <span class="upload-sub" id="file-count">No files selected</span>
+            </div>
+          </div>
+
+          <!-- Selected file list (populated by JS) -->
+          <ul class="file-list" id="file-list"></ul>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submit-btn">
+          <span class="btn-text">Find best matches</span>
+          <span class="btn-spinner" id="spinner" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.25"/>
+              <path d="M12 2a10 10 0 0110 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Analysing…
+          </span>
+        </button>
+
+      </form>
+    </section>
+
+
+    <!-- ── RIGHT PANEL: Results ───────────────────── -->
+    <section class="panel panel-results">
+
+      <!-- Error state -->
+      {% if error %}
+        <div class="alert alert-error">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          {{ error }}
+        </div>
+      {% endif %}
+
+      <!-- Skipped files warning -->
+      {% if skipped %}
+        <div class="alert alert-warn">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+            <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Skipped unsupported files:
+          {% for f in skipped %}
+            <code>{{ f }}</code>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Results -->
+      {% if results %}
+
+        <div class="results-header">
+          <h2 class="panel-title">Results</h2>
+          <span class="results-count">{{ total }} resume{{ 's' if total != 1 else '' }} ranked</span>
+        </div>
+
+        <!-- Top 3 podium cards -->
+        <div class="podium">
+          {% for r in top3 %}
+            <div class="podium-card podium-{{ loop.index }}">
+              <span class="podium-rank">#{{ r.rank }}</span>
+              <span class="podium-name">{{ r.name }}</span>
+              <span class="podium-score">{{ r.score }}%</span>
+              <span class="badge badge-{{ r.label | lower }}">{{ r.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Full ranked table -->
+        {% if total > 3 %}
+          <h3 class="section-label">All candidates</h3>
+        {% endif %}
+
+        <ul class="result-list">
+          {% for r in results %}
+            <li class="result-item {% if r.rank <= 3 %}result-item--top{% endif %}">
+
+              <span class="result-rank">{{ r.rank }}</span>
+
+              <span class="result-name">{{ r.name }}</span>
+
+              <!-- Score bar -->
+              <span class="result-bar-wrap">
+                <span
+                  class="result-bar"
+                  style="--pct: {{ r.score }}%"
+                ></span>
+              </span>
+
+              <span class="result-score">{{ r.score }}%</span>
+
+              <span class="badge badge-{{ r.label | lower }}">{{ r.label }}</span>
+
+            </li>
+          {% endfor %}
+        </ul>
+
+      {% else %}
+        <!-- Empty state — shown on first load -->
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+              <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1"/>
+              <path d="M9 12h6M9 16h4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="empty-title">No results yet</p>
+          <p class="empty-sub">Upload resumes and paste a job description to see ranked matches.</p>
+        </div>
+      {% endif %}
+
+    </section>
+
+  </main>
+
+  <!-- Our JS — served from /static/app.js by FastAPI -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
