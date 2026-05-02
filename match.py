@@ -41,7 +41,7 @@ def is_allowed_file(filename: str) -> bool:
 #function to text from pdf file
 def extract_pdf(path: str) -> str:
     text = " "
-    with open("path", "rb") as f:
+    with open(path, "rb") as f:
         reader = PyPDF2.PdfReader(f)
     for i, pages in enumerate(reader.pages):
         page_text = pages.extract_text()
